@@ -18,10 +18,16 @@ typedef struct {
 	Log *logs;
 } Task;
 
-int complete(char *task);
-int uncomplete(char *task);
+void complete(char *name, char *message);
+void uncomplete(char *name);
+void addTask(char *name);
+void removeTask(char *name);
 
 int writeTask(Task *t);
-Task readTask(char *t);
+Task readTask(char *n);
 
+//Task overview
 void printTask(Task *t);
+
+//Most recent n log items (0 for all)
+void printLog(Task *t, int n);
