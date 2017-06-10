@@ -13,25 +13,19 @@
 
 #include "db.h"
 
-void complete(char *name, char *message);
-void uncomplete(char *name);
-
-void addTask(char *name);
-void removeTask(char *name);
-
 int getday();
 char *basePath();
 char *taskPath(char *name);
 char *logPath(char *name);
 void assertSaveDir();
 
-//Read and write a task
-int writeTask(Task *t);
-Task readTask(char *n);
-
 //Read and write the logs of an existing task
+//not exposed because they don't need to be
 int writeLog(Task *t);
 int readLog(Task *t);
+
+//Reset streak if necessary
+void checkStreak(Task *t);
 
 
 int getday() {
@@ -80,6 +74,7 @@ void assertSaveDir() {
 }
 
 int writeTask(Task *t) {
+	checkStreak(t);
 	char *path = taskPath(t->name);
 	FILE *f = fopen(path, "w");
 	free(path);
@@ -88,20 +83,29 @@ int writeTask(Task *t) {
 	fwrite(t, sizeof(*t), 1, f);
 	writeLog(t);
 	fclose(f);
+	return 1; //success
 }
 
-Task readTask(char *n) {
+Task *readTask(char *n) {
 	char *path = taskPath(n);
 	FILE *f = fopen(path, "r");
 	free(path);
-	Task new;
+	Task *new = malloc(sizeof(Task));
 
-	fread(new.name, sizeof(char), 32, f);
-	fread(&new.streak, sizeof(int), 1, f);
-	fread(&new.logc, sizeof(int), 1, f);
-	readLog(&new);
+	fread(new->name, sizeof(char), 32, f);
+	fread(&new->streak, sizeof(int), 1, f);
+	fread(&new->active, sizeof(bool), 1, f);
+	fread(&new->logc, sizeof(int), 1, f);
+	if (new->logc > 0) {
+		readLog(new);
+	}
+	else {
+		new->logs = NULL;
+	}
 
 	fclose(f);
+
+	checkStreak(new);
 	return new;
 }
 
@@ -120,6 +124,13 @@ int readLog(Task *t) {
 
 	fclose(f);
 	return 1; //success
+}
+
+void freeTask(Task *t) {
+	if (t->logc > 0) {
+		free(t->logs);
+	}
+	free(t);
 }
 
 int writeLog(Task *t) {
@@ -152,32 +163,68 @@ void printLog(Task *t, int n) {
 }
 
 void complete(char *name, char *message) {
-	char *path = taskPath(name);
-	Task t = readTask(path);
-	free(path);
-	t.streak++;
-	t.logc++;
-	t.logs = realloc(t.logs, sizeof(Log)*t.logc);
-	t.logs[t.logc-1].day = getday();
-	strncpy(t.logs[t.logc-1].message, message, 140);
-	writeTask(&t);
+	Task *t = readTask(name);
+	t->streak++;
+	t->logc++;
+	t->logs = realloc(t->logs, sizeof(Log)*t->logc);
+	t->logs[t->logc-1].day = getday();
+	memset(t->logs[t->logc-1].message, '\0', 140);
+	strncpy(t->logs[t->logc-1].message, message, 140);
+	writeTask(t);
+	freeTask(t);
 }
 
 void uncomplete(char *name) {
-	char *path = taskPath(name);
-	Task t = readTask(path);
-	free(path);
-	t.streak--;
-	t.logc--;
-	t.logs = realloc(t.logs, sizeof(Log)*t.logc);
-	writeTask(&t);
+	Task *t = readTask(name);
+	t->streak--;
+	t->logc--;
+	t->logs = realloc(t->logs, sizeof(Log)*t->logc);
+	writeTask(t);
+	freeTask(t);
+}
+
+void start(char *name) {
+	Task *t = readTask(name);
+	t->active = true;
+	writeTask(t);
+	freeTask(t);
+}
+
+void stop(char *name) {
+	Task *t = readTask(name);
+	t->active = false;
+	writeTask(t);
+	freeTask(t);
 }
 
 void addTask(char *name) {
 	Task t;
 	strncpy(t.name, name, 32);
 	t.streak = 0;
+	t.active = true;
 	t.logc = 0;
 	t.logs = NULL;
 	writeTask(&t);
+}
+
+void removeTask(char *name) {
+	char *task_path = taskPath(name);
+	char *log_path = logPath(name);
+
+	remove(task_path);
+	remove(log_path);
+
+	free(task_path);
+	free(log_path);
+}
+
+void checkStreak(Task *t) {
+	if (t->logc > 0 && t->active) {
+		int today = getday();
+		int lastday = t->logs[t->logc-1].day;
+		//If the task wasn't completed today or yesterday, reset
+		if (today != lastday && today-1 != lastday) {
+			t->streak = 0;
+		}
+	}
 }

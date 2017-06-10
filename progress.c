@@ -10,7 +10,48 @@
 #include "db.h"
 
 int main(int argc, char *argv[]) {
-	if (argc > 1) {
+	if (argc < 3 && strcmp(argv[1], "help") != 0) {
+		printf("%s [verb] [task]\n", argv[0]);
+		return 1;
+	}
+
+	if (strcmp(argv[1], "help") == 0) {
+		printf("%s [verb] [task]\n", argv[0]);
+		printf("\tadd remove complete uncomplete show log\n");
+		return 0;
+	}
+	else if (strcmp(argv[1], "add") == 0) {
+		addTask(argv[2]);
+	}
+	else if (strcmp(argv[1], "remove") == 0) {
+		removeTask(argv[2]);
+	}
+	else if (strcmp(argv[1], "complete") == 0) {
+		char *message = "";
+		if  (argc > 3) {
+			message = argv[3];
+		}
+		complete(argv[2], message);
+	}
+	else if (strcmp(argv[1], "uncomplete") == 0) {
+		uncomplete(argv[2]);
+	}
+	else if (strcmp(argv[1], "show") == 0) {
+		Task *t = readTask(argv[2]);
+		printTask(t);
+		printLog(t, 3);
+		freeTask(t);
+	}
+	else if (strcmp(argv[1], "log") == 0) {
+		Task *t = readTask(argv[2]);
+		int n = 3;
+		if (argc > 3) {
+			n = atoi(argv[3]);
+		}
+		printLog(t, n);
+		freeTask(t);
+	}
+	/*if (argc == -1) {
 		Task t;
 		if (strcmp(argv[1], "read") == 0) {
 			Task t = readTask("progress");
@@ -27,5 +68,5 @@ int main(int argc, char *argv[]) {
 		printTask(&t);
 		printLog(&t, 0);
 		free(t.logs);
-	}
+	}*/
 }
